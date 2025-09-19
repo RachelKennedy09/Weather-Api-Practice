@@ -3,15 +3,11 @@ import { useFetchData } from "../hooks/useFetchData";
 
 /*
   PURPOSE (beginner words):
-  - Reuse our custom hook to show current weather for Lake Louise.
-  - Translate the numeric "weathercode" into a friendly label + emoji.
-  - Add small, readable styles so it feels like a real widget.
+  - Reuse our custom hook to show current weather for a given location.
+  - Translate numeric weathercode → friendly label + emoji.
+  - Accept props so this works for ANY location/units.
 */
 
-// 1) WMO -> label + emoji map (Open-Meteo uses these codes)
-//    Reference gist: 0 clear, 1–3 clouds, 45–48 fog, 51–57 drizzle/freezing drizzle,
-//    61–67 rain/freezing rain, 71–77 snow, 80–86 showers, 95–99 thunder.
-//    (We pick clear, expressive emojis that work on all devices.)
 const WMO_CODE_MAP = {
   0: { label: "Clear sky", emoji: "☀️" },
   1: { label: "Mainly clear", emoji: "🌤️" },
@@ -43,20 +39,16 @@ const WMO_CODE_MAP = {
   99: { label: "Severe thunder w/ hail", emoji: "⛈️🧊" },
 };
 
-// 2) Night tweak for clear/partly clear
-//    - At night, show moon variants for clearer conditions.
 function getWeatherInfo(code, isDay) {
   const base = WMO_CODE_MAP[code] || { label: "Unknown", emoji: "❓" };
   if (!isDay) {
     if (code === 0) return { label: base.label, emoji: "🌙" }; // clear night
-    if (code === 1 || code === 2) return { label: base.label, emoji: "🌙☁️" }; // some clouds at night
+    if (code === 1 || code === 2) return { label: base.label, emoji: "🌙☁️" }; // a bit cloudy at night
   }
   return base;
 }
 
-// 3) Wind degrees → compass direction (e.g., 270° = W)
 function toCardinal(deg) {
-  // 16-wind compass
   const dirs = [
     "N",
     "NNE",
@@ -75,39 +67,57 @@ function toCardinal(deg) {
     "NW",
     "NNW",
   ];
-  // round to nearest of 16 slices (22.5° each)
   const idx = Math.round((deg % 360) / 22.5) % 16;
   return dirs[idx];
 }
 
-// Build the Open-Meteo URL for current weather at a lat/lon
-function buildOpenMeteoURL(lat, lon) {
-  return `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=celsius&windspeed_unit=kmh&timezone=auto`;
+/* ⬇️ UPDATED: accept and use units/timezone from props */
+function buildOpenMeteoURL(lat, lon, tempUnit, windUnit, timezone) {
+  const qs = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    current_weather: "true",
+    temperature_unit: tempUnit, // 'celsius' | 'fahrenheit'
+    windspeed_unit: windUnit, // 'kmh' | 'ms' | 'mph'
+    timezone, // 'auto' or 'America/Edmonton', etc.
+  });
+  return `https://api.open-meteo.com/v1/forecast?${qs.toString()}`;
 }
 
-export default function WeatherNow() {
-  // Lake Louise
-  const LAT = 51.43;
-  const LON = -116.18;
+export default function WeatherNow(props) {
+  const {
+    placeName = "Lake Louise",
+    lat = 51.43,
+    lon = -116.18,
+    initialDelayMs = 1000,
+    tempUnit = "celsius",
+    windUnit = "kmh",
+    timezone = "auto",
+  } = props;
 
-  // Adjustable minimum loader time
-  const [delayMs, setDelayMs] = useState(1000);
+  const [delayMs, setDelayMs] = useState(initialDelayMs);
 
-  const url = buildOpenMeteoURL(LAT, LON);
+  // ⬇️ use the updated builder with all props
+  const url = buildOpenMeteoURL(lat, lon, tempUnit, windUnit, timezone);
   const { data, loading, error } = useFetchData(url, undefined, delayMs);
 
-  const current = data?.current_weather; // might be undefined initially
+  const current = data?.current_weather;
   const info = current
     ? getWeatherInfo(current.weathercode, !!current.is_day)
     : null;
   const windCardinal = current ? toCardinal(current.winddirection) : null;
 
+  // tiny labels for display (we’ll add real toggles in Step 10)
+  const tempUnitLabel = tempUnit === "fahrenheit" ? "°F" : "°C";
+  const windUnitLabel =
+    windUnit === "mph" ? "mph" : windUnit === "ms" ? "m/s" : "km/h";
+
   return (
     <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 720 }}>
-      <h1>Weather Now — Lake Louise</h1>
+      {/* ⬇️ use prop, not hard-coded name */}
+      <h1>Weather Now — {placeName}</h1>
       <p>// Friendly label + emoji derived from weathercode.</p>
 
-      {/* Controls (same idea as Step 6) */}
       <div
         style={{
           display: "flex",
@@ -117,6 +127,7 @@ export default function WeatherNow() {
           background: "#f6f8fa",
           borderRadius: 8,
           marginTop: 8,
+          flexWrap: "wrap",
         }}
       >
         <label>
@@ -135,16 +146,20 @@ export default function WeatherNow() {
             <option value={2000}>2000</option>
           </select>
         </label>
+
+        {/* ⬇️ FIXED: use props `lat`/`lon`, not LAT/LON */}
         <div style={{ fontSize: 14, color: "#333" }}>
-          Coords: <strong>{LAT.toFixed(2)}</strong>,{" "}
-          <strong>{LON.toFixed(2)}</strong>
+          Coords: <strong>{lat.toFixed(2)}</strong>,{" "}
+          <strong>{lon.toFixed(2)}</strong>
+        </div>
+        <div style={{ fontSize: 14, color: "#333" }}>
+          Units: <strong>{tempUnitLabel}</strong> •{" "}
+          <strong>{windUnitLabel}</strong>
         </div>
       </div>
 
-      {/* Loading */}
       {loading && <p style={{ marginTop: 12 }}>Loading current weather…</p>}
 
-      {/* Error */}
       {error && (
         <div
           style={{
@@ -160,7 +175,6 @@ export default function WeatherNow() {
         </div>
       )}
 
-      {/* Empty/unexpected */}
       {!loading && !error && !current && (
         <div
           style={{
@@ -175,7 +189,6 @@ export default function WeatherNow() {
         </div>
       )}
 
-      {/* Success card */}
       {!loading && !error && current && info && (
         <div
           style={{
@@ -190,18 +203,16 @@ export default function WeatherNow() {
             alignItems: "center",
           }}
         >
-          {/* Big emoji */}
           <div style={{ fontSize: 56, lineHeight: "1" }}>{info.emoji}</div>
-
-          {/* Details */}
           <div>
             <div style={{ fontSize: 20, fontWeight: 600 }}>{info.label}</div>
             <div style={{ fontSize: 36, fontWeight: 700, marginTop: 4 }}>
-              {current.temperature}°C
+              {current.temperature}
+              {tempUnitLabel}
             </div>
             <div style={{ marginTop: 6 }}>
-              Wind: {current.windspeed} km/h{" "}
-              {windCardinal && `(${windCardinal} ${current.winddirection}°)`}
+              Wind: {current.windspeed} {windUnitLabel}
+              {windCardinal && ` (${windCardinal} ${current.winddirection}°)`}
             </div>
             <div style={{ marginTop: 2 }}>
               Daytime: {current.is_day ? "Yes" : "No"} • Updated: {current.time}
