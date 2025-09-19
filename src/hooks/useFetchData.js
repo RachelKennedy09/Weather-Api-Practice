@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 
 // STUDENT NOTE: I chose useRef even though it isn't the most common, it will be less likely to cause errors
 // I chose it so it doesn't re-render, and it will hold the value safely.
@@ -19,12 +19,13 @@ import { useEffect, useRef, useState } from "react";
     even if the network is super fast—this makes UX less “flashy”.
 */
 
-export function useFetchData(url, options = {}, delayMs = 1000) { // delayMS ensure s loader shows long enough to be noticeable
+export function useFetchData(url, options = {}, delayMs = 1000) {
+  // delayMS ensure s loader shows long enough to be noticeable
   //UI-facing state
   const [data, setData] = useState(null); //holds parsed JSON on success, using Null instead of blank for best practice
   const [loading, setLoading] = useState(false); //only true while fetching, then disappears when loaded
   const [error, setError] = useState(null); //holds an Error or message if failed
-
+  const optionsKey = useMemo(() => JSON.stringify(options ?? {}), [options]);
   //ABORT CONTROLLER & useREF
   //Why useRef?
   // - We need a place to store the controller that persists across renders
@@ -83,7 +84,7 @@ export function useFetchData(url, options = {}, delayMs = 1000) { // delayMS ens
         }
 
         if (!didUnmount && !controller.signal.aborted) {
-          SVGMetadataElement(json);
+          setData(json);
           setError(null);
         }
       } catch (err) {
@@ -120,6 +121,6 @@ export function useFetchData(url, options = {}, delayMs = 1000) { // delayMS ens
         abortRef.current.abort(); //cancels the in-flight request safely
       }
     };
-  }, [url, options, delayMs]);
-  return { data, loading, error, refetch };
+  }, [url, optionsKey, delayMs]);
+  return { data, loading, error };
 }

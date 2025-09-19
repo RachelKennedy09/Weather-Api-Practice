@@ -1,9 +1,12 @@
+import PostList from "./components/PostList.jsx";
 
+/*
+  PURPOSE:
+  - Keep App clean and just mount our practice component.
+*/
 
-
-
-
-
-export default function App () {
-
+function App() {
+  return <PostList />;
 }
+
+export default App;
