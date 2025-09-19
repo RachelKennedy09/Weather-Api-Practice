@@ -1,12 +1,18 @@
 import PostList from "./components/PostList.jsx";
+import WeatherNow from "./components/WeatherNow.jsx";
 
 /*
   PURPOSE:
-  - Keep App clean and just mount our practice component.
+  - Keep practicing both endpoints on one screen for comparison.
+  - You can comment out <PostList /> later if you want only weather.
 */
 
-function App() {
-  return <PostList />;
+export default function App() {
+  return (
+    <>
+      <PostList />
+      <hr style={{ margin: "24px 0" }} />
+      <WeatherNow />
+    </>
+  );
 }
-
-export default App;
